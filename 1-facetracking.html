@@ -1,0 +1,216 @@
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Real-Time Face Tracking in the Browser with TensorFlow.js</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.4.0/dist/tf.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.1/dist/face-landmarks-detection.js"></script>
+        <script src="triangles.js"></script>
+    </head>
+    <style>
+        body {
+            background-color: yellow;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .h1 {
+            color: black;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .capture-button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #f39c12; /* Orange button background */
+            color: #fff; /* White button text color */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 30px;
+        }
+
+        .capture-button:hover:hover {
+            background-color: #e67e22; 
+        }
+        #webcam-container {
+            position: relative;
+
+        }
+
+        #webcam {
+            visibility: hidden;
+            width: auto;
+            height: auto;
+        }
+
+        #webcam-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #output {
+            margin-top: 20px;
+            border: 2px solid #fdffb6;
+        }
+
+        #captured-photo-container {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .captured-photo {
+            width: 200px;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin: 10px;
+            border: 2px solid #fdffb6;
+        }
+        
+        </style>
+        </head>
+        <body>
+            
+                <h1 >FACE FILTER</h1>
+            
+                <div id="webcam-container">
+                    <video id="webcam" playsinline></video>
+                   
+                    <button class="capture-button" onclick="takePhoto()" style="padding: 10px 20px; cursor: pointer;">Take a Photo</button>
+                </div>
+            
+                <div id="loading">Opening Camera...</div>
+            
+                <canvas id="output"></canvas>
+                <div id="captured-photo-container"></div>
+            
+            <script>
+                async function setupWebcam() {
+            const loadingIndicator = document.getElementById("loading");
+            try {
+                const webcamElement = document.getElementById("webcam");
+                const navigatorAny = navigator;
+                navigator.getUserMedia =
+                    navigator.getUserMedia ||
+                    navigatorAny.webkitGetUserMedia ||
+                    navigatorAny.mozGetUserMedia ||
+                    navigatorAny.msGetUserMedia;
+                if (navigator.getUserMedia) {
+                    loadingIndicator.style.display = "block";
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    webcamElement.srcObject = stream;
+                    await new Promise((resolve) => (webcamElement.onloadedmetadata = resolve));
+                    loadingIndicator.style.display = "none";
+                } else {
+                    throw new Error("getUserMedia is not supported");
+                }
+            } catch (error) {
+                console.error("Error accessing webcam:", error);
+                loadingIndicator.style.display = "none";
+                alert("Error accessing webcam. Please make sure you have granted camera access.");
+            }
+        }
+        
+                async function trackFace() {
+                    const video = document.getElementById("webcam");
+                    const faces = await model.estimateFaces({
+                        input: video,
+                        returnTensors: false,
+                        flipHorizontal: false,
+                    });
+        
+                    const canvas = document.getElementById("output");
+                    const ctx = canvas.getContext("2d");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+                    faces.forEach((face) => {
+                        const keypoints = face.scaledMesh;
+                        ctx.strokeStyle = "#fdffb6";
+                        ctx.lineWidth = 2;
+        
+                        // Draw the bounding box
+                        const x1 = face.boundingBox.topLeft[0];
+                        const y1 = face.boundingBox.topLeft[1];
+                        const x2 = face.boundingBox.bottomRight[0];
+                        const y2 = face.boundingBox.bottomRight[1];
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.lineTo(x1, y2);
+                        ctx.lineTo(x1, y1);
+                        ctx.stroke();
+        
+                        // Draw the face mesh
+                        for (let i = 0; i < FaceTriangles.length / 3; i++) {
+                            const pointA = keypoints[FaceTriangles[i * 3]];
+                            const pointB = keypoints[FaceTriangles[i * 3 + 1]];
+                            const pointC = keypoints[FaceTriangles[i * 3 + 2]];
+        
+                            ctx.beginPath();
+                            ctx.moveTo(pointA[0], pointA[1]);
+                            ctx.lineTo(pointB[0], pointB[1]);
+                            ctx.lineTo(pointC[0], pointC[1]);
+                            ctx.lineTo(pointA[0], pointA[1]);
+                            ctx.stroke();
+                        }
+                    });
+        
+                    requestAnimationFrame(trackFace);
+                }
+        
+                async function takePhoto() {
+    const canvas = document.getElementById("output");
+    const capturedPhotoData = canvas.toDataURL();
+
+    localStorage.setItem("capturedPhotoData", capturedPhotoData);
+
+    window.location.href = "third_page.html";}
+                let model;
+        
+                (async () => {
+                    await setupWebcam();
+                    const video = document.getElementById("webcam");
+                    video.play();
+                    const videoWidth = video.videoWidth;
+                    const videoHeight = video.videoHeight;
+                    video.width = videoWidth;
+                    video.height = videoHeight;
+        
+                    const canvas = document.getElementById("output");
+                    canvas.width = video.width;
+                    canvas.height = video.height;
+        
+                    const output = canvas.getContext("2d");
+                    output.translate(canvas.width, 0);
+                    output.scale(-1, 1); // Mirror cam
+        
+                    // Load Face Landmarks Detection model
+                    model = await faceLandmarksDetection.load(
+                        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+                    );
+        
+                    trackFace();
+                })();
+            </script>
+        </body>
+        </html>
